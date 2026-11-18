@@ -1,0 +1,10 @@
+# Secrets (clés API/OTA, Wi-Fi) — ne jamais versionner
+esphome/secrets.yaml
+
+# Build ESPHome
+esphome/.esphome/
+.esphome/
+
+# Environnement Python local
+.venv/
+__pycache__/

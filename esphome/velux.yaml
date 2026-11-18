@@ -1,0 +1,208 @@
+# Pilotage de Velux (io-homecontrol) via une télécommande 3LI D13 WW
+# "pilotée" par un ESP32-C3, sans aucun composant :
+#  - la télécommande est alimentée par le 3V3 de l'ESP32 (GND commun) ;
+#  - chaque GPIO est soudé directement sur la pastille "signal" d'un bouton ;
+#  - en open-drain, le GPIO tire la ligne à 0 V pour "appuyer", et le reste
+#    du temps il la laisse libre et la RELIT : les appuis faits à la main sur
+#    la télécommande mettent à jour l'état du volet dans Home Assistant ;
+#  - pull-up interne activé : la ligne reste à 3,3 V même si un fil se
+#    débranche (sinon elle "flotte" et génère des appuis fantômes).
+#
+# Une télécommande = un groupe : si elle pilote plusieurs Velux, ils bougent
+# ensemble et sont vus comme UN volet. Chronométrer le plus lent.
+
+substitutions:
+  name: velux
+  friendly_name: Velux
+  pulse_ms: 300ms          # durée d'un "appui" (500ms si appuis ratés)
+  open_duration: 42s       # chronométré fermé -> ouvert (+1 s de marge)
+  close_duration: 42s      # chronométré ouvert -> fermé (+1 s de marge)
+  address: velux.lan       # nom/IP pour OTA et logs (ex. velux.local, 192.168.1.50)
+  pin_up: GPIO5
+  pin_stop: GPIO6
+  pin_down: GPIO7
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+
+esp32:
+  board: esp32-c3-devkitm-1   # ESP32-C3 Super Mini
+  framework:
+    type: esp-idf
+
+logger:
+
+api:
+  encryption:
+    key: !secret api_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  use_address: ${address}
+  ap:
+    ssid: "Velux Fallback"
+    password: !secret fallback_password
+
+captive_portal:
+
+globals:
+  # vrai pendant qu'un appui vient de l'ESP32 : on ignore alors la relecture
+  - id: esp_pressing
+    type: bool
+    initial_value: "false"
+  # vrai pendant qu'on recopie un appui physique dans l'état du volet :
+  # les actions du volet n'envoient alors pas de nouvel appui radio
+  - id: manual
+    type: bool
+    initial_value: "false"
+
+# --- Sorties : open-drain, "on" = ligne tirée à 0 V = bouton appuyé -------
+output:
+  - platform: gpio
+    id: out_up
+    pin: &pin_up
+      number: ${pin_up}
+      inverted: true
+      allow_other_uses: true
+      mode: { input: true, output: true, open_drain: true, pullup: true }
+  - platform: gpio
+    id: out_stop
+    pin: &pin_stop
+      number: ${pin_stop}
+      inverted: true
+      allow_other_uses: true
+      mode: { input: true, output: true, open_drain: true, pullup: true }
+  - platform: gpio
+    id: out_down
+    pin: &pin_down
+      number: ${pin_down}
+      inverted: true
+      allow_other_uses: true
+      mode: { input: true, output: true, open_drain: true, pullup: true }
+
+# --- Appui (mode restart : jamais deux impulsions superposées) -----------
+# btn : 0 = haut, 1 = stop, 2 = bas
+script:
+  - id: press
+    mode: restart
+    parameters:
+      btn: int
+    then:
+      - lambda: id(esp_pressing) = true;
+      - output.turn_off: out_up
+      - output.turn_off: out_stop
+      - output.turn_off: out_down
+      - lambda: |-
+          if (btn == 0) id(out_up).turn_on();
+          else if (btn == 1) id(out_stop).turn_on();
+          else id(out_down).turn_on();
+      - delay: ${pulse_ms}
+      - output.turn_off: out_up
+      - output.turn_off: out_stop
+      - output.turn_off: out_down
+      - delay: 100ms         # laisse la ligne remonter avant de relire
+      - lambda: id(esp_pressing) = false;
+
+# --- Relecture des boutons physiques de la télécommande ------------------
+binary_sensor:
+  - platform: gpio
+    id: sense_up
+    name: "Appui manuel haut"
+    entity_category: diagnostic
+    pin: *pin_up
+    filters: &sense_filters
+      - lambda: return x && !id(esp_pressing);
+      - delayed_on: 30ms     # anti-rebond
+    on_press:
+      - lambda: id(manual) = true;
+      - cover.open: velux_cover
+      - lambda: id(manual) = false;
+  - platform: gpio
+    id: sense_stop
+    name: "Appui manuel stop"
+    entity_category: diagnostic
+    pin: *pin_stop
+    filters: *sense_filters
+    on_press:
+      - lambda: id(manual) = true;
+      - cover.stop: velux_cover
+      - lambda: id(manual) = false;
+  - platform: gpio
+    id: sense_down
+    name: "Appui manuel bas"
+    entity_category: diagnostic
+    pin: *pin_down
+    filters: *sense_filters
+    on_press:
+      - lambda: id(manual) = true;
+      - cover.close: velux_cover
+      - lambda: id(manual) = false;
+
+# --- Boutons bruts (utiles pour tester / recaler) -----------------------
+button:
+  - platform: template
+    name: "Bouton haut"
+    icon: mdi:arrow-up
+    entity_category: config
+    on_press:
+      - script.execute: { id: press, btn: 0 }
+  - platform: template
+    name: "Bouton stop"
+    icon: mdi:stop
+    entity_category: config
+    on_press:
+      - script.execute: { id: press, btn: 1 }
+  - platform: template
+    name: "Bouton bas"
+    icon: mdi:arrow-down
+    entity_category: config
+    on_press:
+      - script.execute: { id: press, btn: 2 }
+  - platform: restart
+    name: "Redémarrer"
+
+# --- Volet principal exposé à HA / Alexa --------------------------------
+cover:
+  - platform: time_based
+    id: velux_cover
+    name: None               # entité nommée comme l'appareil : cover.velux
+    device_class: shutter
+    has_built_in_endstop: true
+    assumed_state: true      # affiche ▲ et ▼ même si l'état estimé dit ouvert/fermé
+    open_action:
+      - if:
+          condition:
+            lambda: return !id(manual);
+          then:
+            - script.execute: { id: press, btn: 0 }
+    open_duration: ${open_duration}
+    close_action:
+      - if:
+          condition:
+            lambda: return !id(manual);
+          then:
+            - script.execute: { id: press, btn: 2 }
+    close_duration: ${close_duration}
+    stop_action:
+      - if:
+          condition:
+            lambda: return !id(manual);
+          then:
+            - script.execute: { id: press, btn: 1 }
+
+sensor:
+  - platform: wifi_signal
+    name: "Signal Wi-Fi"
+    entity_category: diagnostic
+  - platform: internal_temperature
+    name: "Température interne"
+    entity_category: diagnostic
+  - platform: uptime
+    name: "Uptime"
+    entity_category: diagnostic
