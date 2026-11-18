@@ -49,8 +49,8 @@ Si un bouton n'a aucune pastille reliée au GND, il est câblé en matrice : ce
 montage direct ne marche pas, il faut alors des optocoupleurs.
 
 ## 3. Câblage
-Schéma détaillé : [`docs/cablage.fr.html`](docs/cablage.fr.html) (à ouvrir dans un
-navigateur).
+Schéma détaillé : **[voir en ligne](https://nyrrell.github.io/velux-esp32-remote/cablage.fr.html)**
+(source : [`docs/cablage.fr.html`](docs/cablage.fr.html)).
 
 ```
   ESP32-C3 Super Mini               Télécommande 3LI D13 WW (sans piles)
