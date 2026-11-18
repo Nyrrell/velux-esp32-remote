@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Câblage ESP32-C3 Velux</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout : une planche de schéma pleine largeur, puis des fiches courtes en colonne lisible */
+:root {
+  --bg: #f6f7f5;
+  --paper: #ffffff;
+  --fg: #1d2421;
+  --muted: #5e6a65;
+  --line: #c9d1cd;
+  --ink: #2c3531;
+  --up: #c2410c;
+  --stop: #a16207;
+  --down: #1d4ed8;
+  --pwr: #be123c;
+  --gnd: #3f3f46;
+  --board: #e7efe9;
+  --remote: #eef0f4;
+  --font-body: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141917; --paper: #1b211e; --fg: #e4ebe7; --muted: #9aa7a1; --line: #34403b; --ink: #cfd8d3;
+    --up: #fb923c; --stop: #facc15; --down: #60a5fa; --pwr: #fb7185; --gnd: #a1a1aa;
+    --board: #1f2c25; --remote: #222630; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141917; --paper: #1b211e; --fg: #e4ebe7; --muted: #9aa7a1; --line: #34403b; --ink: #cfd8d3;
+  --up: #fb923c; --stop: #facc15; --down: #60a5fa; --pwr: #fb7185; --gnd: #a1a1aa;
+  --board: #1f2c25; --remote: #222630; color-scheme: dark;
+}
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 980px; margin: 0 auto; padding-block: 32px 56px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 28px; }
+h1 { font-size: 1.7rem; margin: 0; text-wrap: balance; font-weight: 600; }
+h2 { font-size: 1.1rem; margin: 0 0 8px; font-weight: 600; }
+.lede { color: var(--muted); margin: 6px 0 0; max-width: 65ch; }
+.sheet { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; overflow-x: auto; }
+.sheet svg { display: block; min-width: 720px; width: 100%; height: auto; }
+svg text { font-family: var(--font-mono); fill: var(--ink); font-size: 13px; }
+svg .t-small { font-size: 11px; fill: var(--muted); }
+svg .t-title { font-family: var(--font-body); font-weight: 600; font-size: 15px; }
+svg .t-btn { font-family: var(--font-body); font-weight: 600; font-size: 14px; }
+.w { fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.w-up { stroke: var(--up); } .w-stop { stroke: var(--stop); } .w-down { stroke: var(--down); }
+.w-pwr { stroke: var(--pwr); } .w-gnd { stroke: var(--gnd); }
+.sym { fill: none; stroke: var(--ink); stroke-width: 1.6; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
+.cols > section { min-width: 0; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 7px 10px 7px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-weight: 500; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+td code, li code { font-family: var(--font-mono); font-size: 13px; }
+.tbl { overflow-x: auto; }
+.chip { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+ol, ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.lang { margin: 0 0 10px; font-size: 14px; }
+.lang a { color: var(--muted); }
+.warn { border-left: 3px solid var(--up); padding: 4px 0 4px 14px; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <p class="lang"><a href="cablage.html">🇬🇧 English version</a></p>
+    <h1>Câblage ESP32-C3 → télécommande Velux 3LI D13 WW</h1>
+    <p class="lede">Cinq fils, aucun composant (deux condensateurs en option). L'ESP32 alimente la télécommande en 3,3 V. Chaque GPIO, en open-drain, tire la pastille d'un bouton à 0 V pendant 300 ms pour « appuyer ». Le reste du temps il relit la ligne, ce qui permet de voir les appuis faits à la main.</p>
+  </header>
+
+  <div class="sheet" role="img" aria-label="Schéma : le 3V3 et le GND de l'ESP32 vont aux deux extrémités du compartiment à piles de la télécommande, avec un condensateur optionnel entre les deux ; GPIO5, 6 et 7 vont directement sur la pastille signal des boutons haut, stop et bas, dont l'autre pastille est au GND.">
+    <svg viewBox="0 0 860 540" xmlns="http://www.w3.org/2000/svg">
+      <!-- ESP32 -->
+      <rect x="40" y="50" width="180" height="440" rx="8" fill="var(--board)" stroke="var(--line)"/>
+      <text x="56" y="78" class="t-title">ESP32-C3 Super Mini</text>
+      <text x="56" y="98" class="t-small">alimenté en USB 5 V</text>
+      <!-- Télécommande -->
+      <rect x="500" y="50" width="320" height="440" rx="14" fill="var(--remote)" stroke="var(--line)"/>
+      <text x="516" y="78" class="t-title">Télécommande 3LI D13 WW</text>
+
+      <!-- Bus GND télécommande (pastilles GND des boutons) -->
+      <path d="M700 160 V375" class="w w-gnd" stroke-dasharray="2 5"/>
+      <text x="692" y="392" text-anchor="end" class="t-small">piste GND = borne −</text>
+
+      <!-- Alimentation -->
+      <g>
+        <rect x="212" y="415" width="10" height="10" fill="var(--ink)"/>
+        <rect x="212" y="455" width="10" height="10" fill="var(--ink)"/>
+        <text x="204" y="424" text-anchor="end">3V3</text>
+        <text x="204" y="464" text-anchor="end">GND</text>
+        <path d="M222 420 H600" class="w w-pwr"/>
+        <path d="M222 460 H600" class="w w-gnd"/>
+        <!-- condensateur -->
+        <path d="M330 420 V432 M330 448 V460" class="sym"/>
+        <path d="M316 432 H344 M316 448 H344" class="sym" stroke-width="2.2"/>
+        <text x="352" y="444" class="t-small">100 µF + 100 nF (option)</text>
+        <!-- compartiment piles -->
+        <rect x="600" y="404" width="190" height="72" rx="10" fill="none" stroke="var(--ink)" stroke-width="1.4" stroke-dasharray="5 4"/>
+        <circle cx="600" cy="420" r="5" fill="var(--remote)" stroke="var(--ink)" stroke-width="1.6"/>
+        <circle cx="600" cy="460" r="5" fill="var(--remote)" stroke="var(--ink)" stroke-width="1.6"/>
+        <text x="612" y="424" class="t-small">+ (extrémité)</text>
+        <text x="612" y="464" class="t-small">− (autre extrémité)</text>
+        <text x="782" y="444" text-anchor="end" class="t-small">piles retirées</text>
+      </g>
+
+      <g id="ch"></g>
+    </svg>
+  </div>
+
+  <div class="cols">
+    <section>
+      <h2>Liste des connexions</h2>
+      <div class="tbl"><table>
+        <thead><tr><th>ESP32</th><th>Télécommande</th></tr></thead>
+        <tbody>
+          <tr><td><span class="chip" style="background:var(--pwr)"></span><code>3V3</code></td><td>borne + du compartiment</td></tr>
+          <tr><td><span class="chip" style="background:var(--gnd)"></span><code>GND</code></td><td>borne − du compartiment</td></tr>
+          <tr><td><span class="chip" style="background:var(--up)"></span><code>GPIO5</code></td><td>▲ pastille signal</td></tr>
+          <tr><td><span class="chip" style="background:var(--stop)"></span><code>GPIO6</code></td><td>■ pastille signal</td></tr>
+          <tr><td><span class="chip" style="background:var(--down)"></span><code>GPIO7</code></td><td>▼ pastille signal</td></tr>
+        </tbody>
+      </table></div>
+      <p style="margin:10px 0 0;color:var(--muted)">Optionnel : condensateurs 100 µF + 100 nF entre + et −, au plus près de la télécommande, si des appuis sont ratés. Les pastilles GND des boutons ne reçoivent aucun fil.</p>
+    </section>
+
+    <section>
+      <h2>Repérer les pastilles</h2>
+      <ol>
+        <li><strong>Continuité</strong>, piles retirées : sur chaque bouton, la pastille qui bipe avec le − du compartiment est le GND. L'autre est le signal.</li>
+        <li><strong>Tension</strong>, piles remises : pointe noire au −, pointe rouge sur le signal. Tu dois lire ≈ 3 V au repos, 0 V en appuyant, et toujours ≈ 3 V après 20 s de veille.</li>
+        <li>Court-circuite signal et GND avec un fil : les Velux doivent bouger.</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>Comment l'ESP32 voit les appuis manuels</h2>
+      <ul>
+        <li>Au repos, le GPIO est en entrée avec son pull-up interne : la ligne reste à 3,3 V (la télécommande la tient aussi à 3 V).</li>
+        <li>Si quelqu'un appuie sur le bouton, la ligne tombe à 0 V. L'ESP32 le lit et met à jour <code>cover.velux</code> sans renvoyer d'ordre radio.</li>
+        <li>Pendant ses propres appuis (+ 100 ms), l'ESP32 ignore la lecture.</li>
+        <li>Les appuis faits avec une autre télécommande ne sont pas visibles.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Pièges à éviter</h2>
+      <ul>
+        <li class="warn"><strong>Retire les 2 piles AAA</strong> : branchées sur le 3,3 V elles recevraient du courant de charge et fuiraient.</li>
+        <li class="warn"><strong>Pas de diode</strong> sur le 3V3 : la télécommande doit être exactement au même potentiel que les GPIO.</li>
+        <li>Soude sur les deux extrémités du compartiment, pas sur la lamelle du milieu qui relie les piles.</li>
+        <li>Si un appui est raté de temps en temps : ajouter les condensateurs (100–470 µF + 100 nF), ou <code>pulse_ms</code> à 500 ms.</li>
+        <li>Fils fins (AWG 28–30) et soudure rapide : les pastilles de télécommande se décollent si on chauffe trop.</li>
+      </ul>
+    </section>
+  </div>
+</div>
+
+<script>
+(function () {
+  const NS = "http://www.w3.org/2000/svg";
+  const g = document.getElementById("ch");
+  const el = (tag, attrs, text) => {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (text) e.textContent = text;
+    g.appendChild(e);
+    return e;
+  };
+  const chans = [
+    { y: 140, gpio: "GPIO5", cls: "w-up", btn: "▲ HAUT" },
+    { y: 240, gpio: "GPIO6", cls: "w-stop", btn: "■ STOP" },
+    { y: 340, gpio: "GPIO7", cls: "w-down", btn: "▼ BAS" },
+  ];
+  chans.forEach((c) => {
+    const s = c.y - 20, gnd = c.y + 20;
+    // Broche ESP32
+    el("rect", { x: 212, y: s - 5, width: 10, height: 10, fill: "var(--ink)" });
+    el("text", { x: 204, y: s + 4, "text-anchor": "end" }, c.gpio);
+    el("text", { x: 300, y: s - 10, "text-anchor": "middle", class: "t-small" }, "open-drain");
+    // Fil direct vers la pastille signal
+    el("path", { d: `M222 ${s} H636`, class: "w " + c.cls });
+    // Bouton (contact poussoir)
+    el("path", { d: `M640 ${s} V${c.y - 8} M640 ${gnd} V${c.y + 8} L654 ${c.y - 6}`, class: "sym" });
+    el("path", { d: `M660 ${c.y} H672`, class: "sym" });
+    el("circle", { cx: 640, cy: s, r: 5, fill: "var(--remote)", stroke: "var(--ink)", "stroke-width": 1.6 });
+    el("circle", { cx: 640, cy: gnd, r: 5, fill: "var(--remote)", stroke: "var(--ink)", "stroke-width": 1.6 });
+    el("path", { d: `M645 ${gnd} H700`, class: "w w-gnd", "stroke-width": 2 });
+    el("text", { x: 628, y: s - 9, "text-anchor": "end", class: "t-small" }, "signal 3 V");
+    el("text", { x: 628, y: gnd + 4, "text-anchor": "end", class: "t-small" }, "GND");
+    el("text", { x: 805, y: c.y + 5, "text-anchor": "end", class: "t-btn" }, c.btn);
+  });
+})();
+</script>
+</body>
+</html>

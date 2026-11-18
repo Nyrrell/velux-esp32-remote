@@ -49,7 +49,7 @@ Si un bouton n'a aucune pastille reliée au GND, il est câblé en matrice : ce
 montage direct ne marche pas, il faut alors des optocoupleurs.
 
 ## 3. Câblage
-Schéma détaillé : [`docs/cablage.html`](docs/cablage.html) (à ouvrir dans un
+Schéma détaillé : [`docs/cablage.fr.html`](docs/cablage.fr.html) (à ouvrir dans un
 navigateur).
 
 ```

@@ -47,8 +47,8 @@ If a button has no pad connected to GND, it's wired as a matrix: this direct
 wiring won't work and you'll need optocouplers instead.
 
 ## 3. Wiring
-Detailed diagram (in French): [`docs/cablage.html`](docs/cablage.html), open
-it in a browser.
+Detailed diagram: [`docs/cablage.html`](docs/cablage.html), open it in a
+browser.
 
 ```
   ESP32-C3 Super Mini               3LI D13 WW remote (no batteries)
